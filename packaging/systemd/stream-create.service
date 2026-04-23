@@ -1,27 +1,23 @@
 [Unit]
-Description=Air Gap Upstream Service - Kafka to UDP Sender
+Description=Air Gap Create Service - Resend Bundle Generator
 Documentation=https://github.com/anders-wartoft/air-gap
-Documentation=file:///usr/share/doc/airgap-upstream/README.md
+Documentation=file:///usr/share/doc/stream-downstream/README.md
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=simple
-User=airgap
-Group=airgap
+Type=oneshot
+User=stream
+Group=stream
 
 # Working directory for relative paths in config
-WorkingDirectory=/etc/airgap
+WorkingDirectory=/etc/stream
 
 # Main execution
-ExecStart=/usr/local/bin/airgap-upstream /etc/airgap/upstream-%i.properties
+ExecStart=/usr/local/bin/stream-create /etc/stream/create.properties
 
 # Environment file (optional overrides)
-EnvironmentFile=-/etc/default/airgap-upstream
-
-# Restart behavior
-Restart=on-failure
-RestartSec=10
+EnvironmentFile=-/etc/default/stream-create
 
 # Resource limits
 LimitNOFILE=65536
@@ -30,14 +26,14 @@ MemoryMax=1G
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=airgap-upstream
+SyslogIdentifier=stream-create
 
 # Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/airgap/upstream /var/log/airgap
+ReadWritePaths=/var/lib/stream/create /var/log/stream
 
 [Install]
 WantedBy=multi-user.target

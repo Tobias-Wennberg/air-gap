@@ -1,23 +1,23 @@
 [Unit]
 Description=Air Gap Deduplication Service Instance %i
 Documentation=https://github.com/anders-wartoft/air-gap
-Documentation=file:///usr/share/doc/airgap-dedup/README.md
+Documentation=file:///usr/share/doc/stream-dedup/README.md
 After=network-online.target kafka.service
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=airgap
-Group=airgap
+User=stream
+Group=stream
 
 # Working directory
-WorkingDirectory=/opt/airgap/dedup
+WorkingDirectory=/opt/stream/dedup
 
 # Main execution with Java options from environment
-ExecStart=/bin/sh -c 'exec /usr/bin/java ${JAVA_OPTS:--Xms512m -Xmx4g} -jar /opt/airgap/dedup/air-gap-deduplication-fat.jar'
+ExecStart=/bin/sh -c 'exec /usr/bin/java ${JAVA_OPTS:--Xms512m -Xmx4g} -jar /opt/stream/dedup/air-gap-deduplication-fat.jar'
 
 # Instance-specific environment file
-EnvironmentFile=/etc/default/airgap-dedup-%i
+EnvironmentFile=/etc/default/stream-dedup-%i
 Environment=INSTANCE_ID=%i
 
 # Restart behavior
@@ -31,14 +31,14 @@ MemoryMax=4G
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=airgap-dedup-%i
+SyslogIdentifier=stream-dedup-%i
 
 # Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/airgap/dedup /var/log/airgap
+ReadWritePaths=/var/lib/stream/dedup /var/log/stream
 
 [Install]
 WantedBy=multi-user.target

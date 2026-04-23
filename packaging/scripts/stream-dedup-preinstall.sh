@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-# Create airgap system user and group (idempotent)
-AIRGAP_USER="airgap"
-AIRGAP_GROUP="airgap"
+# Create stream system user and group (idempotent)
+AIRGAP_USER="stream"
+AIRGAP_GROUP="stream"
 
 # Detect package type
 if [ -f /etc/redhat-release ] || [ -f /etc/rocky-release ]; then
@@ -18,7 +18,7 @@ fi
 
 # Create group if doesn't exist
 if ! getent group "$AIRGAP_GROUP" >/dev/null 2>&1; then
-    echo "Creating airgap group..."
+    echo "Creating stream group..."
     case "$PKG_TYPE" in
         rpm)
             groupadd -r "$AIRGAP_GROUP" 2>/dev/null || true
@@ -34,18 +34,18 @@ fi
 
 # Create user if doesn't exist
 if ! id "$AIRGAP_USER" >/dev/null 2>&1; then
-    echo "Creating airgap user..."
+    echo "Creating stream user..."
     case "$PKG_TYPE" in
         rpm)
             useradd -r -g "$AIRGAP_GROUP" -s /sbin/nologin \
-                -d /var/lib/airgap -c "Air Gap Service User" "$AIRGAP_USER" 2>/dev/null || true
+                -d /var/lib/stream -c "Air Gap Service User" "$AIRGAP_USER" 2>/dev/null || true
             ;;
         deb)
-            adduser --system --group --no-create-home --home /var/lib/airgap \
+            adduser --system --group --no-create-home --home /var/lib/stream \
                 --gecos "Air Gap Service User" "$AIRGAP_USER" 2>/dev/null || true
             ;;
         apk)
-            adduser -S -G "$AIRGAP_GROUP" -H -h /var/lib/airgap \
+            adduser -S -G "$AIRGAP_GROUP" -H -h /var/lib/stream \
                 -s /sbin/nologin "$AIRGAP_USER" 2>/dev/null || true
             ;;
     esac

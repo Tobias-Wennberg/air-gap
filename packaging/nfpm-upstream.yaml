@@ -16,49 +16,49 @@ license: "LGPL-2.1-only"
 contents:
   # Binaries
   - src: target/linux-amd64/upstream
-    dst: /usr/local/bin/airgap-upstream
+    dst: /usr/local/bin/stream-upstream
     file_info:
       mode: 0755
 
   - src: target/linux-amd64/resend
-    dst: /usr/local/bin/airgap-resend
+    dst: /usr/local/bin/stream-resend
     file_info:
       mode: 0755
 
   # Systemd services
-  - src: packaging/systemd/airgap-upstream@.service
-    dst: /lib/systemd/system/airgap-upstream@.service
+  - src: packaging/systemd/stream-upstream@.service
+    dst: /lib/systemd/system/stream-upstream@.service
     file_info:
       mode: 0644
 
-  - src: packaging/systemd/airgap-resend@.service
-    dst: /lib/systemd/system/airgap-resend@.service
+  - src: packaging/systemd/stream-resend@.service
+    dst: /lib/systemd/system/stream-resend@.service
     file_info:
       mode: 0644
 
   # Configuration examples
   - src: config/upstream.properties
-    dst: /etc/airgap/upstream.properties.example
+    dst: /etc/stream/upstream.properties.example
     type: config
     file_info:
       mode: 0644
 
   - src: config/resend.properties
-    dst: /etc/airgap/resend.properties.example
+    dst: /etc/stream/resend.properties.example
     type: config
     file_info:
       mode: 0644
 
   # Documentation
   - src: README.md
-    dst: /usr/share/doc/airgap-upstream/README.md
+    dst: /usr/share/doc/stream-upstream/README.md
     file_info:
       mode: 0644
 
 scripts:
-  preinstall: packaging/scripts/airgap-upstream-preinstall.sh
-  postinstall: packaging/scripts/airgap-upstream-postinstall.sh
-  postremove: packaging/scripts/airgap-upstream-postremove.sh
+  preinstall: packaging/scripts/stream-upstream-preinstall.sh
+  postinstall: packaging/scripts/stream-upstream-postinstall.sh
+  postremove: packaging/scripts/stream-upstream-postremove.sh
 
 overrides:
   rpm:

@@ -15,55 +15,55 @@ license: "LGPL-2.1-only"
 
 contents:
   - src: java-streams/target/air-gap-deduplication-fat.jar
-    dst: /opt/airgap/dedup/air-gap-deduplication-fat.jar
+    dst: /opt/stream/dedup/air-gap-deduplication-fat.jar
     file_info:
       mode: 0644
 
   - src: target/linux-amd64/create
-    dst: /usr/local/bin/airgap-create
+    dst: /usr/local/bin/stream-create
     file_info:
       mode: 0755
 
   # Systemd template service
-  - src: packaging/systemd/airgap-dedup@.service
-    dst: /lib/systemd/system/airgap-dedup@.service
+  - src: packaging/systemd/stream-dedup@.service
+    dst: /lib/systemd/system/stream-dedup@.service
     file_info:
       mode: 0644
 
-  - src: packaging/systemd/airgap-create.service
-    dst: /lib/systemd/system/airgap-create.service
+  - src: packaging/systemd/stream-create.service
+    dst: /lib/systemd/system/stream-create.service
     file_info:
       mode: 0644
 
   # Configuration templates
   - src: config/dedup-template.env
-    dst: /etc/airgap/dedup-template.env
+    dst: /etc/stream/dedup-template.env
     type: config
     file_info:
       mode: 0644
 
   - src: config/log4j2.xml
-    dst: /etc/airgap/log4j2.xml
+    dst: /etc/stream/log4j2.xml
     type: config|noreplace
     file_info:
       mode: 0644
 
   - src: config/create.properties
-    dst: /etc/airgap/create.properties.example
+    dst: /etc/stream/create.properties.example
     type: config
     file_info:
       mode: 0644
 
   # Documentation
   - src: README.md
-    dst: /usr/share/doc/airgap-dedup/README.md
+    dst: /usr/share/doc/stream-dedup/README.md
     file_info:
       mode: 0644
 
 scripts:
-  preinstall: packaging/scripts/airgap-dedup-preinstall.sh
-  postinstall: packaging/scripts/airgap-dedup-postinstall.sh
-  postremove: packaging/scripts/airgap-dedup-postremove.sh
+  preinstall: packaging/scripts/stream-dedup-preinstall.sh
+  postinstall: packaging/scripts/stream-dedup-postinstall.sh
+  postremove: packaging/scripts/stream-dedup-postremove.sh
 
 overrides:
   rpm:

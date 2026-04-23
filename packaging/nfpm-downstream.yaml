@@ -16,40 +16,40 @@ license: "LGPL-2.1-only"
 contents:
   # Binaries
   - src: target/linux-amd64/downstream
-    dst: /usr/local/bin/airgap-downstream
+    dst: /usr/local/bin/stream-downstream
     file_info:
       mode: 0755
 
   # Systemd services
-  - src: packaging/systemd/airgap-downstream@.service
-    dst: /lib/systemd/system/airgap-downstream@.service
+  - src: packaging/systemd/stream-downstream@.service
+    dst: /lib/systemd/system/stream-downstream@.service
     file_info:
       mode: 0644
 
   # Configuration examples
   - src: config/downstream.properties
-    dst: /etc/airgap/downstream.properties.example
+    dst: /etc/stream/downstream.properties.example
     type: config
     file_info:
       mode: 0644
 
 
   - src: config/gap_detector.properties
-    dst: /etc/airgap/gap_detector.properties.example
+    dst: /etc/stream/gap_detector.properties.example
     type: config
     file_info:
       mode: 0644
 
   # Documentation
   - src: README.md
-    dst: /usr/share/doc/airgap-downstream/README.md
+    dst: /usr/share/doc/stream-downstream/README.md
     file_info:
       mode: 0644
 
 scripts:
-  preinstall: packaging/scripts/airgap-downstream-preinstall.sh
-  postinstall: packaging/scripts/airgap-downstream-postinstall.sh
-  postremove: packaging/scripts/airgap-downstream-postremove.sh
+  preinstall: packaging/scripts/stream-downstream-preinstall.sh
+  postinstall: packaging/scripts/stream-downstream-postinstall.sh
+  postremove: packaging/scripts/stream-downstream-postremove.sh
 
 overrides:
   rpm:

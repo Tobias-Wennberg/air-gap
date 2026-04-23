@@ -1,23 +1,23 @@
 [Unit]
 Description=Air Gap Resend Service - Gap Recovery Sender
 Documentation=https://github.com/anders-wartoft/air-gap
-Documentation=file:///usr/share/doc/airgap-upstream/README.md
+Documentation=file:///usr/share/doc/stream-upstream/README.md
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=airgap
-Group=airgap
+User=stream
+Group=stream
 
 # Working directory for relative paths in config
-WorkingDirectory=/etc/airgap
+WorkingDirectory=/etc/stream
 
 # Main execution
-ExecStart=/usr/local/bin/airgap-resend /etc/airgap/resend-%i.properties
+ExecStart=/usr/local/bin/stream-resend /etc/stream/resend-%i.properties
 
 # Environment file (optional overrides)
-EnvironmentFile=-/etc/default/airgap-resend
+EnvironmentFile=-/etc/default/stream-resend
 
 # Resource limits
 LimitNOFILE=65536
@@ -26,14 +26,14 @@ MemoryMax=1G
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=airgap-resend
+SyslogIdentifier=stream-resend
 
 # Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/airgap/upstream /var/log/airgap
+ReadWritePaths=/var/lib/stream/resend /var/log/stream
 
 [Install]
 WantedBy=multi-user.target
