@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"sitia.nu/airgap/src/protocol"
 )
 
 // A private key, the filename and the hash of the file
@@ -23,34 +25,39 @@ type KeyInfo struct {
 
 // TransferConfiguration struct definition
 type TransferConfiguration struct {
-	id                   string
-	nic                  string
-	targetIP             string
-	targetPort           int
-	bootstrapServers     string
-	topic                string
-	mtu                  uint16
-	key                  []byte    // symmetric
-	keyInfos             []KeyInfo // array of private keys
-	privateKeyGlob       string
-	target               string
-	transport            string // Transport protocol: udp or tcp (default: udp)
-	logLevel             string
-	logFileName          string
-	certFile             string
-	keyFile              string
-	caFile               string
-	clientID             string
-	topicTranslations    string
-	translations         map[string]string // map from input topic to output topic
-	logStatistics        int32             //  How often to log statistics in seconds. 0 means no logging
-	numReceivers         int               // Number of UDP receivers to start
-	channelBufferSize    int               // Size of the channel buffer between UDP receiver and Kafka writer
-	batchSize            int               // Number of messages to batch together
-	readBufferMultiplier uint16            // Multiplier for the read buffer size
-	rcvBufSize           int               // Size of the OS receive buffer for UDP sockets
-	keyPasswordFile      string            // File containing the password to decrypt the key file
+	id                    string
+	nic                   string
+	targetIP              string
+	targetPort            int
+	bootstrapServers      string
+	topic                 string
+	mtu                   uint16
+	key                   []byte    // symmetric
+	keyInfos              []KeyInfo // array of private keys
+	privateKeyGlob        string
+	target                string
+	transport             string // Transport protocol: udp or tcp (default: udp)
+	logLevel              string
+	logFileName           string
+	certFile              string
+	keyFile               string
+	caFile                string
+	clientID              string
+	topicTranslations     string
+	translations          map[string]string // map from input topic to output topic
+	logStatistics         int32             //  How often to log statistics in seconds. 0 means no logging
+	numReceivers          int               // Number of UDP receivers to start
+	channelBufferSize     int               // Size of the channel buffer between UDP receiver and Kafka writer
+	batchSize             int               // Number of messages to batch together
+	readBufferMultiplier  uint16            // Multiplier for the read buffer size
+	rcvBufSize            int               // Size of the OS receive buffer for UDP sockets
+	keyPasswordFile       string            // File containing the password to decrypt the key file
 	maximumDecompressSize int
+	// Security limits - protect the downstream listening port from DoS
+	maxCacheEntries            int // Maximum in-flight fragment-reassembly entries (OOM protection)
+	maxNrMessages              int // Maximum nrMessages value accepted in a single packet
+	maxTCPConnections          int // Maximum concurrent TCP connections
+	keyExchangeMinIntervalSecs int // Minimum seconds between accepted KEY_EXCHANGE messages
 }
 
 // Builder pattern setters for TransferConfiguration
@@ -145,6 +152,10 @@ func defaultConfiguration() TransferConfiguration {
 	config.rcvBufSize = 4 * 1024 * 1024 // default 4MB OS receive buffer for UDP sockets
 	config.topic = "airgap-internal"
 	config.maximumDecompressSize = 256 * 1024 * 1024 // default 256 MiB
+	config.maxCacheEntries = int(protocol.DefaultMaxCacheEntries)
+	config.maxNrMessages = int(protocol.DefaultMaxNrMessages)
+	config.maxTCPConnections = 256
+	config.keyExchangeMinIntervalSecs = 1
 	return config
 }
 
@@ -323,6 +334,44 @@ func readConfiguration(fileName string, result TransferConfiguration) (TransferC
 			if err != nil {
 				Logger.Fatalf("Error converting maximumDecompressSize \"%s\" to integer value", value)
 			}
+		case "maxCacheEntries":
+			// Maximum in-flight fragment-reassembly entries. Protects against OOM when
+			// the listening port is flooded with packets using unique message IDs.
+			tmp, err := strconv.Atoi(value)
+			if err != nil || tmp < 1 {
+				Logger.Fatalf("Error in config maxCacheEntries. Illegal value: %s. Legal values are positive integers", value)
+			}
+			result.maxCacheEntries = tmp
+			Logger.Printf("maxCacheEntries: %d", result.maxCacheEntries)
+		case "maxNrMessages":
+			// Maximum nrMessages value in a single packet. Packets claiming more fragments
+			// than this are rejected early to prevent cache entries that can never complete.
+			tmp, err := strconv.Atoi(value)
+			if err != nil || tmp < 1 || tmp > 65535 {
+				Logger.Fatalf("Error in config maxNrMessages. Illegal value: %s. Legal values are 1-65535", value)
+			}
+			result.maxNrMessages = tmp
+			Logger.Printf("maxNrMessages: %d", result.maxNrMessages)
+		case "maxTCPConnections":
+			// Maximum simultaneous TCP connections. Without a cap every connection spawns
+			// a goroutine; a flood of connections exhausts memory and goroutine stacks.
+			tmp, err := strconv.Atoi(value)
+			if err != nil || tmp < 1 {
+				Logger.Fatalf("Error in config maxTCPConnections. Illegal value: %s. Legal values are positive integers", value)
+			}
+			result.maxTCPConnections = tmp
+			Logger.Printf("maxTCPConnections: %d", result.maxTCPConnections)
+		case "keyExchangeMinIntervalSecs":
+			// Minimum seconds between accepted KEY_EXCHANGE messages. Each KEY_EXCHANGE
+			// triggers RSA-OAEP decryption for every loaded private key; rate-limiting
+			// prevents CPU exhaustion. Legitimate key rotation runs every hundreds of
+			// seconds so a 1 s floor does not affect normal operation.
+			tmp, err := strconv.Atoi(value)
+			if err != nil || tmp < 0 {
+				Logger.Fatalf("Error in config keyExchangeMinIntervalSecs. Illegal value: %s. Legal values are 0 or higher", value)
+			}
+			result.keyExchangeMinIntervalSecs = tmp
+			Logger.Printf("keyExchangeMinIntervalSecs: %d", result.keyExchangeMinIntervalSecs)
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -493,6 +542,38 @@ func overrideConfiguration(config TransferConfiguration) TransferConfiguration {
 			Logger.Fatalf("Error converting maximumDecompressSize \"%s\" to integer value", maximumDecompressSize)
 		}
 	}
+	if v := os.Getenv(prefix + "MAX_CACHE_ENTRIES"); v != "" {
+		tmp, err := strconv.Atoi(v)
+		if err != nil || tmp < 1 {
+			Logger.Fatalf("Error in env var %sMAX_CACHE_ENTRIES. Illegal value: %s. Legal values are positive integers", prefix, v)
+		}
+		Logger.Print("Overriding maxCacheEntries with environment variable: " + prefix + "MAX_CACHE_ENTRIES with value: " + v)
+		config.maxCacheEntries = tmp
+	}
+	if v := os.Getenv(prefix + "MAX_NR_MESSAGES"); v != "" {
+		tmp, err := strconv.Atoi(v)
+		if err != nil || tmp < 1 || tmp > 65535 {
+			Logger.Fatalf("Error in env var %sMAX_NR_MESSAGES. Illegal value: %s. Legal values are 1-65535", prefix, v)
+		}
+		Logger.Print("Overriding maxNrMessages with environment variable: " + prefix + "MAX_NR_MESSAGES with value: " + v)
+		config.maxNrMessages = tmp
+	}
+	if v := os.Getenv(prefix + "MAX_TCP_CONNECTIONS"); v != "" {
+		tmp, err := strconv.Atoi(v)
+		if err != nil || tmp < 1 {
+			Logger.Fatalf("Error in env var %sMAX_TCP_CONNECTIONS. Illegal value: %s. Legal values are positive integers", prefix, v)
+		}
+		Logger.Print("Overriding maxTCPConnections with environment variable: " + prefix + "MAX_TCP_CONNECTIONS with value: " + v)
+		config.maxTCPConnections = tmp
+	}
+	if v := os.Getenv(prefix + "KEY_EXCHANGE_MIN_INTERVAL_SECS"); v != "" {
+		tmp, err := strconv.Atoi(v)
+		if err != nil || tmp < 0 {
+			Logger.Fatalf("Error in env var %sKEY_EXCHANGE_MIN_INTERVAL_SECS. Illegal value: %s. Legal values are 0 or higher", prefix, v)
+		}
+		Logger.Print("Overriding keyExchangeMinIntervalSecs with environment variable: " + prefix + "KEY_EXCHANGE_MIN_INTERVAL_SECS with value: " + v)
+		config.keyExchangeMinIntervalSecs = tmp
+	}
 	return config
 }
 
@@ -511,7 +592,7 @@ func logConfiguration(config TransferConfiguration) {
 	Logger.Printf("  logFileName: %s", config.logFileName)
 	Logger.Printf("  certFile: %s", config.certFile)
 	Logger.Printf("  keyFile: %s", config.keyFile)
-	Logger.Printf("  keyPasswordFile: %s", config.keyPasswordFile)
+	Logger.Printf("  keyPasswordFile: [set]")
 	Logger.Printf("  caFile: %s", config.caFile)
 	Logger.Printf("  topicTranslations: %s", config.topicTranslations)
 	Logger.Printf("  logStatistics: %d", config.logStatistics)
@@ -526,6 +607,10 @@ func logConfiguration(config TransferConfiguration) {
 		Logger.Printf("  topicTranslations: %s", config.topicTranslations)
 	}
 	Logger.Printf("  maximumDecompressSize: %s", config.maximumDecompressSize)
+	Logger.Printf("  maxCacheEntries: %d", config.maxCacheEntries)
+	Logger.Printf("  maxNrMessages: %d", config.maxNrMessages)
+	Logger.Printf("  maxTCPConnections: %d", config.maxTCPConnections)
+	Logger.Printf("  keyExchangeMinIntervalSecs: %d", config.keyExchangeMinIntervalSecs)
 }
 
 // Check the configuration. On fail, will terminate the application
@@ -619,7 +704,7 @@ func checkConfiguration(result TransferConfiguration) TransferConfiguration {
 func intPow(base int, exp uint) int {
 	out := 1
 	for _ = range exp {
-		out = out*base
+		out = out * base
 	}
 	return out
 }
@@ -630,7 +715,7 @@ func convertUnitSufix(size string) (int, error) {
 		mult := 1
 		out, err := strconv.Atoi(num)
 		if err == nil {
-			return out * mult , nil
+			return out * mult, nil
 		}
 	}
 	if num, found := strings.CutSuffix(size, "KiB"); found {
@@ -638,7 +723,7 @@ func convertUnitSufix(size string) (int, error) {
 		mult := intPow(2, 10)
 		out, err := strconv.Atoi(num)
 		if err == nil {
-			return out * mult , nil
+			return out * mult, nil
 		}
 	}
 	if num, found := strings.CutSuffix(size, "MiB"); found {
@@ -646,26 +731,26 @@ func convertUnitSufix(size string) (int, error) {
 		mult := intPow(2, 20)
 		out, err := strconv.Atoi(num)
 		if err == nil {
-			return out * mult , nil
+			return out * mult, nil
 		}
 	}
 	if num, found := strings.CutSuffix(size, "GiB"); found {
 		mult := intPow(2, 30)
 		out, err := strconv.Atoi(num)
 		if err == nil {
-			return out * mult , nil
+			return out * mult, nil
 		}
 	}
 	if num, found := strings.CutSuffix(size, "TiB"); found {
 		mult := intPow(2, 40)
 		out, err := strconv.Atoi(num)
 		if err == nil {
-			return out * mult , nil
+			return out * mult, nil
 		}
 	}
 	out, err := strconv.Atoi(size)
 	if err != nil {
-		return 0, err 
+		return 0, err
 	}
 	return out, nil
 }
